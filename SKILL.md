@@ -28,7 +28,7 @@ description: 在本地知识库、项目文档、笔记或代码中，不依赖 
 
 ## 逐层检索
 
-1. 每次检索先检查目标根目录内是否存在 `.cache`，并读取其中与当前检索方向有关的缓存清单、机器缓存和可读索引。优先检查 `file2intent.md`、`.chousi.intent.json`、`.organizer.intent.json`、`.organizer.state.json` 和 `.organizer.raw-analysis.json`；只有需要恢复或理解未完成缓存任务时才查看 `.organizer.analysis-required.json` 与 `runs/`。配置、预演和整理报告不作为内容证据。完整兼容关系见 [references/cache-compatibility.md](references/cache-compatibility.md)。不得把 `.cache` 本身当作知识库正文递归搜索。
+1. 每次检索先检查目标根目录内是否存在 `.cache`，并读取其中与当前检索方向有关的缓存清单、机器缓存和可读索引。优先检查 `file2intent.md`、`.chousi.intent.json`、`.organizer.intent.json`、`.organizer.state.json` 和 `.organizer.raw-analysis.json`；需要判断缓存能力或盲区时读取 `.organizer.dependencies.json`，只有需要恢复或理解未完成缓存任务时才查看 `.organizer.analysis-required.json` 与 `runs/`。配置、预演和整理报告不作为内容证据。完整兼容关系见 [references/cache-compatibility.md](references/cache-compatibility.md)。不得把 `.cache` 本身当作知识库正文递归搜索。
 2. 若没有 `.cache`，运行 `python3 scripts/cache_manager.py init --root <目标目录>` 初始化 `.cache/.chousi.intent.json` 和可读索引。若 `file2intent.md` 已属于其他工具，脚本改用 `.cache/.chousi.file2intent.md`。格式必须遵循下方“缓存格式”。
 3. 用 `rg --files` 盘点实际目录，识别目录结构、文件类型和可能相关的文件名；若 `rg` 不可用，再使用 `find` 等本地工具。搜索时显式排除 `.cache`。
 4. 根据本次问题生成高辨识度实体、原词、同义词、缩写、旧称和组合词。先在索引缓存中筛出候选文件，再运行 `python3 scripts/cache_manager.py inspect --root <目标目录> --path <候选相对路径> ...` 将候选缓存逐一与实际文件核对。没有缓存候选时，对文件名命中项执行同样核对。
@@ -56,7 +56,7 @@ description: 在本地知识库、项目文档、笔记或代码中，不依赖 
       "intent": "一句话内容主题",
       "keywords": ["关键词"],
       "evidence": [{"locator": "行号、页码或章节", "summary": "与检索有关的简短事实"}],
-      "method": "text|metadata|pdf|office|ocr|transcription|unavailable",
+      "method": "text|metadata|pdf|office|ocr|transcription|keyframes|combined|unavailable",
       "confidence": "high|medium|low",
       "analyzed_at": "带时区的 ISO 8601 时间",
       "missing": false

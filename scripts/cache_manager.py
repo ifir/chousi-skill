@@ -178,7 +178,7 @@ def main() -> int:
     record.add_argument("--intent", required=True)
     record.add_argument("--keyword", action="append", default=[])
     record.add_argument("--evidence", action="append", default=[])
-    record.add_argument("--method", choices=("text", "metadata", "pdf", "office", "ocr", "transcription", "unavailable"), required=True)
+    record.add_argument("--method", choices=("text", "metadata", "pdf", "office", "ocr", "transcription", "keyframes", "combined", "unavailable"), required=True)
     record.add_argument("--confidence", choices=("high", "medium", "low"), required=True)
     args = parser.parse_args()
     try:

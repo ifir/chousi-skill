@@ -1,0 +1,7 @@
+interface:
+  display_name: "抽丝"
+  short_description: "沿本地资料线索逐层检索，给出可追溯答案"
+  default_prompt: "使用 $chousi 从我的本地知识库中查找相关资料，并给出带来源的结论。"
+
+policy:
+  allow_implicit_invocation: true

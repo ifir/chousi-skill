@@ -29,16 +29,19 @@
 
 ```bash
 python3 scripts/cache_manager.py init --root <目标目录>
-python3 scripts/cache_manager.py inspect --root <目标目录> --path <相对路径> [--path <相对路径> ...]
+python3 scripts/cache_manager.py inspect --root <目标目录> --direction <检索方向> \
+  --keyword <关键词> --path <相对路径> [--path <相对路径> ...]
 python3 scripts/cache_manager.py record --root <目标目录> --path <相对路径> \
-  --intent <一句话主题> --keyword <关键词> \
+  --direction <检索方向> --intent <一句话主题> --keyword <关键词> \
   --evidence <行号或页码>::<简短事实> --method text --confidence high
 python3 scripts/cache_manager.py index --root <目标目录>
 ```
 
 `inspect` 只读实际文件及缓存并输出 JSON：
 
-- `fresh`：路径对应的缓存指纹与实际文件一致，可直接复用；
+- `fresh`：未指定方向时，路径对应的缓存指纹与实际文件一致；
+- `fresh-covered`：文件指纹有效，且相同方向或本次全部关键词已被某个方向缓存覆盖，可直接复用；
+- `fresh-uncovered`：文件指纹有效，但缓存未覆盖本次检索方向，需要定向读取局部内容并增量缓存；
 - `stale`：同路径有旧记录，但指纹已变化，必须读取原文件并 `record`；
 - `uncached`：实际文件存在但无同路径记录，必须按当前问题读取并 `record`；
 - `missing`：缓存记录指向的实际文件不存在，只报告，不删除记录。

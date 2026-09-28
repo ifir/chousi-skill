@@ -131,7 +131,26 @@ def by_source(data: dict[str, Any]) -> dict[str, tuple[str, dict[str, Any]]]:
     return found
 
 
-def inspect(root: Path, paths: list[str], data: dict[str, Any]) -> list[dict[str, Any]]:
+def normalized(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
+def direction_coverage(item: dict[str, Any], direction: str, keywords: list[str]) -> str:
+    requested_direction = normalized(direction)
+    requested_keywords = {normalized(value) for value in keywords if normalized(value)}
+    cached_keywords: set[str] = set()
+    for entry in item.get("directions", []):
+        if not isinstance(entry, dict):
+            continue
+        if requested_direction and normalized(str(entry.get("direction", ""))) == requested_direction:
+            return "exact-direction"
+        cached_keywords.update(normalized(str(value)) for value in entry.get("keywords", []) if normalized(str(value)))
+    if requested_keywords and requested_keywords.issubset(cached_keywords):
+        return "all-keywords"
+    return "uncovered"
+
+
+def inspect(root: Path, paths: list[str], data: dict[str, Any], direction: str, keywords: list[str]) -> list[dict[str, Any]]:
     known = by_source(data)
     requested = paths or sorted(known)
     results = []
@@ -143,13 +162,16 @@ def inspect(root: Path, paths: list[str], data: dict[str, Any]) -> list[dict[str
             continue
         path = safe_file(root, value)
         current = fingerprint(path)
-        if current in data.get("items", {}):
-            status = "fresh"
+        cached_item = data.get("items", {}).get(current)
+        if isinstance(cached_item, dict):
+            item = cached_item
+            coverage = direction_coverage(item, direction, keywords) if direction or keywords else "not-requested"
+            status = "fresh" if coverage == "not-requested" else ("fresh-covered" if coverage != "uncovered" else "fresh-uncovered")
         elif old:
             status = "stale"
         else:
             status = "uncached"
-        results.append({"path": value, "status": status, "fingerprint": current, "cached_fingerprint": old[0] if old else None})
+        results.append({"path": value, "status": status, "coverage": coverage if isinstance(cached_item, dict) else None, "fingerprint": current, "cached_fingerprint": old[0] if old else None})
     return results
 
 
@@ -172,9 +194,12 @@ def main() -> int:
     check = sub.add_parser("inspect")
     check.add_argument("--root", required=True)
     check.add_argument("--path", action="append", default=[])
+    check.add_argument("--direction", default="")
+    check.add_argument("--keyword", action="append", default=[])
     record = sub.add_parser("record")
     record.add_argument("--root", required=True)
     record.add_argument("--path", required=True)
+    record.add_argument("--direction", required=True)
     record.add_argument("--intent", required=True)
     record.add_argument("--keyword", action="append", default=[])
     record.add_argument("--evidence", action="append", default=[])
@@ -185,17 +210,28 @@ def main() -> int:
         root = valid_root(args.root)
         machine, index, data = initialize(root)
         if args.command == "inspect":
-            result: Any = inspect(root, args.path, data)
+            result: Any = inspect(root, args.path, data, args.direction, args.keyword)
         elif args.command == "record":
             path = safe_file(root, args.path)
             key = fingerprint(path)
             previous = by_source(data).get(args.path)
             stat = path.stat()
+            previous_item = data["items"].get(key, {})
+            directions = list(previous_item.get("directions", [])) if isinstance(previous_item, dict) else []
+            direction_key = normalized(args.direction)
+            directions = [entry for entry in directions if not isinstance(entry, dict) or normalized(str(entry.get("direction", ""))) != direction_key]
+            analyzed_at = now_iso()
+            directions.append({
+                "direction": args.direction, "keywords": list(dict.fromkeys(args.keyword)),
+                "intent": args.intent, "evidence": parse_evidence(args.evidence),
+                "method": args.method, "confidence": args.confidence, "analyzed_at": analyzed_at,
+            })
             item = {
                 "source": args.path, "modified_at": modified_at(path), "size": stat.st_size,
                 "intent": args.intent, "keywords": list(dict.fromkeys(args.keyword)),
                 "evidence": parse_evidence(args.evidence), "method": args.method,
-                "confidence": args.confidence, "analyzed_at": now_iso(), "missing": False,
+                "confidence": args.confidence, "analyzed_at": analyzed_at, "missing": False,
+                "directions": directions,
             }
             if previous and previous[0] != key:
                 item["supersedes"] = previous[0]

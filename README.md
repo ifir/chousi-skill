@@ -12,6 +12,8 @@
 - 每次检索优先复用目标目录中的 `.cache`，按文件指纹检查过期并增量刷新；
 - 缓存格式与 xunxu-skill 保持同类结构，同时使用 `.chousi` 前缀避免覆盖其它工具缓存；
 - 兼容 xunxu 的 OCR、转写、视频关键帧及组合证据缓存，并读取依赖评估识别能力盲区；
+- 按文件类型进行局部意图识别，每个候选文件每轮最多读取 5 个、每块 200–500 字符；
+- 区分首次检索、重复提问和复用 xunxu 缓存三种流程，缓存按检索方向增量生长；
 - 全程本地，不把知识库上传到外部服务。
 
 ## 只读边界与缓存
@@ -53,7 +55,8 @@ chousi-skill/
 ├── agents/
 │   └── openai.yaml
 ├── references/
-│   └── cache-compatibility.md
+│   ├── cache-compatibility.md
+│   └── retrieval-workflows.md
 ├── scripts/
 │   └── cache_manager.py
 └── README.md

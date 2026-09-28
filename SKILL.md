@@ -28,13 +28,15 @@ description: 在本地知识库、项目文档、笔记或代码中，不依赖 
 
 ## 逐层检索
 
+先判断属于“首次检索”“重复提问”还是“复用 xunxu 缓存”，严格按 [references/retrieval-workflows.md](references/retrieval-workflows.md) 的三种流程与文件类型路由执行。共同步骤如下：
+
 1. 每次检索先检查目标根目录内是否存在 `.cache`，并读取其中与当前检索方向有关的缓存清单、机器缓存和可读索引。优先检查 `file2intent.md`、`.chousi.intent.json`、`.organizer.intent.json`、`.organizer.state.json` 和 `.organizer.raw-analysis.json`；需要判断缓存能力或盲区时读取 `.organizer.dependencies.json`，只有需要恢复或理解未完成缓存任务时才查看 `.organizer.analysis-required.json` 与 `runs/`。配置、预演和整理报告不作为内容证据。完整兼容关系见 [references/cache-compatibility.md](references/cache-compatibility.md)。不得把 `.cache` 本身当作知识库正文递归搜索。
 2. 若没有 `.cache`，运行 `python3 scripts/cache_manager.py init --root <目标目录>` 初始化 `.cache/.chousi.intent.json` 和可读索引。若 `file2intent.md` 已属于其他工具，脚本改用 `.cache/.chousi.file2intent.md`。格式必须遵循下方“缓存格式”。
 3. 用 `rg --files` 盘点实际目录，识别目录结构、文件类型和可能相关的文件名；若 `rg` 不可用，再使用 `find` 等本地工具。搜索时显式排除 `.cache`。
-4. 根据本次问题生成高辨识度实体、原词、同义词、缩写、旧称和组合词。先在索引缓存中筛出候选文件，再运行 `python3 scripts/cache_manager.py inspect --root <目标目录> --path <候选相对路径> ...` 将候选缓存逐一与实际文件核对。没有缓存候选时，对文件名命中项执行同样核对。
+4. 根据本次问题生成一个简短的“检索方向”，以及高辨识度实体、原词、同义词、缩写、旧称和组合词。先在索引缓存中筛出候选文件，再运行 `python3 scripts/cache_manager.py inspect --root <目标目录> --direction <检索方向> --keyword <关键词> --path <候选相对路径> ...`，同时核对文件指纹和缓存是否覆盖本次方向。没有缓存候选时，对文件名命中项执行同样核对。
 5. 对每个候选文件计算与循序一致的 `v2` 指纹：SHA-256 依次写入 `v2:<字节数>:<mtime_ns>:`、文件开头最多 64 KiB，以及文件大于 64 KiB 时的末尾最多 64 KiB。路径相同但大小、纳秒修改时间或采样内容变化，均视为缓存过期。仅路径变化不推断为同一文件；本 Skill 不移动文件。
-6. 缓存命中且指纹有效时，直接读取缓存中的 `intent`、`keywords`、`evidence` 和路径信息，不重复读取原文件。缓存缺失、与当前检索方向无关、实际文件不存在于缓存、缓存记录不存在于实际目录，或指纹不一致时，只读取解决当前问题所需的文件；随后使用 `python3 scripts/cache_manager.py record ...` 更新相应缓存。`record` 保留旧记录并通过 `supersedes` 关联新版本。缓存中已不存在的源文件记录可标记 `missing: true`，但不得删除历史记录。
-7. 先搜索高辨识度实体或原词，再搜索扩展词。文本正文优先用 `rg -n -C 3` 查看命中上下文，避免只按文件名猜测。从高价值命中继续抽取文档链接、被引用文件、标题、作者、日期、版本号、任务编号和专有名词，形成“问题 → 命中 → 新线索 → 原始依据”的链条。
+6. 只有 `fresh-covered` 才能直接复用方向缓存而不读取原文件。`fresh-uncovered` 表示文件没变但旧缓存未覆盖本次问题，仍要按当前方向读取局部证据。`stale` 与 `uncached` 也必须读取。随后使用 `python3 scripts/cache_manager.py record --direction <检索方向> ...` 增量更新相应缓存；同一指纹保留其他检索方向，文件变化则通过 `supersedes` 关联旧版本。缓存中已不存在的源文件只报告为 `missing`，不得删除历史记录。
+7. 先搜索高辨识度实体或原词，再搜索扩展词。文本正文优先用 `rg -n` 定位，再以命中点为中心读取 200–500 个 Unicode 字符的语义完整内容块。同一文件同一轮最多保留 5 个去重内容块；重叠或相距不足 100 字符的块合并，优先覆盖不同关键词和章节。初步与检索方向不符的目录或文件不读取正文。相关块能支撑关键结论时，再补读完整段落、章节或相邻结构核验，不能仅凭被截断的片段下结论。
 8. 对 Markdown、纯文本和代码直接检索。对 PDF、Office 文档或其他二进制格式，仅在本地已有安全读取工具时提取有限文本；不要仅为一次检索安装依赖。无法读取时明确列为检索盲区。
 9. 优先阅读最接近原始事实、范围最匹配的材料。二手总结与原始记录冲突时，呈现冲突，并说明版本、日期或语境差异，不擅自抹平。关键问题已有直接证据，且连续两轮定向检索没有新高价值材料时停止。
 
@@ -56,6 +58,7 @@ description: 在本地知识库、项目文档、笔记或代码中，不依赖 
       "intent": "一句话内容主题",
       "keywords": ["关键词"],
       "evidence": [{"locator": "行号、页码或章节", "summary": "与检索有关的简短事实"}],
+      "directions": [{"direction": "本次检索方向", "keywords": ["关键词"], "intent": "该方向下的内容判断", "evidence": [{"locator": "定位", "summary": "短事实"}], "analyzed_at": "带时区的 ISO 8601 时间"}],
       "method": "text|metadata|pdf|office|ocr|transcription|keyframes|combined|unavailable",
       "confidence": "high|medium|low",
       "analyzed_at": "带时区的 ISO 8601 时间",

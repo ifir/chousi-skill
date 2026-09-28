@@ -4,8 +4,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
-import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -41,23 +39,13 @@ def load_json(path: Path, default: Any) -> Any:
         return default
 
 
-def atomic_text(path: Path, content: str) -> None:
+def write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    handle, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.rename(temporary, path)
-    except BaseException:
-        # Do not delete even an incomplete generated cache; leave it beside the
-        # target for explicit inspection and recovery.
-        raise
+    path.write_text(content, encoding="utf-8")
 
 
-def atomic_json(path: Path, data: Any) -> None:
-    atomic_text(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+def write_json(path: Path, data: Any) -> None:
+    write_text(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
 
 
 def cache_paths(root: Path) -> tuple[Path, Path]:
@@ -103,7 +91,7 @@ def initialize(root: Path) -> tuple[Path, Path, dict[str, Any]]:
     data.setdefault("version", 1)
     if not machine.exists():
         data["updated_at"] = now_iso()
-        atomic_json(machine, data)
+        write_json(machine, data)
     if not index.exists():
         write_index(index, data)
     return machine, index, data
@@ -132,7 +120,7 @@ def write_index(path: Path, data: dict[str, Any]) -> None:
         "|---|---|---|---|---|---|---|---|---|\n"
     )
     body = "\n".join(rows(data)) or "| - | - | - | 暂无缓存 | - | - | - | - | - |"
-    atomic_text(path, header + body + "\n")
+    write_text(path, header + body + "\n")
 
 
 def by_source(data: dict[str, Any]) -> dict[str, tuple[str, dict[str, Any]]]:
@@ -213,7 +201,7 @@ def main() -> int:
                 item["supersedes"] = previous[0]
             data["items"][key] = item
             data["updated_at"] = now_iso()
-            atomic_json(machine, data)
+            write_json(machine, data)
             write_index(index, data)
             result = {"recorded": args.path, "fingerprint": key, "index": str(index)}
         elif args.command == "index":

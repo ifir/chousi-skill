@@ -15,6 +15,8 @@
 - 按文件类型进行局部意图识别，每个候选文件每轮最多读取 5 个、每块 200–500 字符；
 - 区分首次检索、重复提问和复用 xunxu 缓存三种流程，缓存按检索方向增量生长；
 - 默认找到一个足以回答问题的高置信度匹配后立即停止，并披露已命中、已搜索无匹配和未搜索目录；用户不满意时再升级为全面搜索；
+- 每个检索方向最多迭代 5 轮，按文件结构渐进读取；PDF 文本先落临时文件再局部检索，Excel 先探查工作表和表头；
+- 优先沿 `file2intent.md`、`data_structure.md`、README 等分层索引进入最相关目录，不把导航索引当成最终证据；
 - 全程本地，不把知识库上传到外部服务。
 
 ## 只读边界与缓存
@@ -57,8 +59,15 @@ chousi-skill/
 │   └── openai.yaml
 ├── references/
 │   ├── cache-compatibility.md
+│   ├── file-routing.md
 │   └── retrieval-workflows.md
 ├── scripts/
-│   └── cache_manager.py
+│   ├── cache_manager.py
+│   ├── cache_common.py
+│   ├── cache_store.py
+│   ├── cache_inspect.py
+│   ├── cache_record.py
+│   ├── cache_index.py
+│   └── extract_text.py
 └── README.md
 ```
